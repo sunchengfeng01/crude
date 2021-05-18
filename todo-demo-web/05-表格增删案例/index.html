@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <title>React App</title>
+
+    <link rel="stylesheet" href="index.css" />
+</head>
+
+<body>
+    <div id="root">
+        <div class="todo-container">
+            <div class="todo-wrap">
+                <div class="todo-header">
+                    <input type="text" placeholder="请输入你的任务名称，按回车键确认" />
+                </div>
+                <h1 id="hh">恭喜你没有任务</h1>
+                <div id="tt">
+                    <ul class="todo-main">
+                    </ul>
+                    <div class="todo-footer">
+                        <label>
+              <input type="checkbox" />
+            </label>
+                        <span> <span>已完成0</span> / 全部2 </span>
+                        <button class="btn btn-danger">清除已完成任务</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const todo_main = document.getElementsByClassName('todo-main')[0]
+        const span = document.querySelector('.todo-footer>span')
+        const hh = document.getElementById('hh')
+        const tt = document.getElementById('tt')
+            //不可再此获取checked DOM对象因为渲染函数没有调用，拿不到
+        const todo_header = document.querySelector('.todo-header input')
+        const todo_footerinput = document.querySelector('.todo-footer label input')
+            //get请求使用jsonp 解决跨域
+        function callback(data) {
+            headerrenda(data)
+            footredan(data)
+        }
+        const script = document.createElement('script')
+        script.src = 'http://127.0.0.1:5000/findTodos?callback=callback'
+            //添加到body
+        document.body.appendChild(script)
+            //渲染头部li
+        function headerrenda(data) {
+            let count = 0
+                //返回值就是回调函数的return值
+            let arrlist = data.reduce((pre, item, index) => {
+                pre.push(` <li>
+                                <label>
+                                    <input type="checkbox" ${item.isDone==="true"?"checked":""} id="${item._id}"/>
+                                    <span>${item.todoName}</span>
+                                </label>
+                                <button class="btn btn-danger" id="${item._id}">删除</button>
+                            </li>`)
+                return pre
+            }, []);
+            todo_main.innerHTML = arrlist.join("")
+                //给所有的复选框添加点击事件
+            let chexkeall = todo_main.querySelectorAll('li>label>input')
+
+            //转化数组
+            chexkeall = Array.from(chexkeall)
+            chexkeall.forEach((item) => {
+                item.onclick = checkcall
+            })
+
+            const deletli = todo_main.querySelectorAll('li>button')
+                //删除every
+            deletli.forEach((item) => {
+                    item.onclick = deletcall
+
+                })
+                //点击选中删除
+            const allchecked = document.querySelector('.todo-footer>button')
+            allchecked.onclick = clearall
+
+            //渲染全选复选框
+            const liinput = document.querySelectorAll('.todo-main li label input')
+            liinput.forEach((item) => {
+
+
+                if (item.checked) {
+                    count++
+                }
+            })
+            if (count === liinput.length) {
+
+                todo_footerinput.checked = true
+            } else {
+                todo_footerinput.checked = false
+            }
+        }
+        //底部渲染
+        function footredan(data) {
+            let count = 0
+            data.forEach(element => {
+                if (element.isDone === 'true') {
+                    count++
+                }
+            });
+            if (data.length === 0) {
+                hh.style.display = 'block'
+                tt.style.display = 'none'
+            } else {
+                hh.style.display = 'none'
+                tt.style.display = 'block'
+                span.innerText = `已完成${count}/全部${data.length}`
+            }
+        }
+        //数据添加
+        todo_header.onkeydown = async function(e) {
+                if (e.keyCode === 13) {
+                    if (!this.value.trim()) return
+                        //最终返回一个promise
+                    const result = await myajaxpost({
+                            url: 'http://127.0.0.1:5000/addTodo',
+                            data: {
+                                todoName: `${ this.value.trim()}`
+                            }
+                        })
+                        //使得输入框里面的值为回复初始值
+                    this.value = ''
+                        //添加数据开始渲染
+                    headerrenda(result)
+                    footredan(result)
+                }
+            }
+            //封装发送请求
+        function myajaxpost(options) {
+            //解构options的成员
+            const {
+                url,
+                data,
+
+            } = options
+            return new Promise((resolve, reject) => {
+                const xhr = new XMLHttpRequest()
+                xhr.open('post', url)
+                xhr.setRequestHeader('content-type', "application/x-www-form-urlencoded")
+                xhr.send(optiondata(data))
+                xhr.onreadystatechange = function() {
+                    if (xhr.readyState === 4 && xhr.status === 200) {
+                        //接收回来把接收回来的字符串转化为对象或者数组
+                        let result = JSON.parse(xhr.responseText)
+                        resolve(result)
+                    }
+                }
+            })
+
+        }
+        //对象类型的数据转成查询字符串形式给ajax使用
+        function optiondata(data) {
+            // {
+            //     name: 'fsa',
+            //     age: 18
+            // }
+            let arr = []
+            for (let key in data) {
+                arr.push(`${key}=${data[key]}`)
+            }
+            return arr.join('&')
+                // data: {
+                //                 ids: JSON.stringify(ids),
+                //                 isDone: 'true'
+                //             }
+                // ids=["fafs"]&isDone=true
+        }
+        //点击选中
+        async function checkcall(e) {
+            let coun = 0
+                //判断是否有被选中的框逻辑
+            if (e.target.hasAttributes('checkbox')) {
+                let ids = e.target.id
+                ids = [ids]
+                let result = null
+                if (e.target.checked) {
+                    result = await myajaxpost({
+                        url: 'http://127.0.0.1:5000/updateTodos',
+                        data: {
+                            ids: JSON.stringify(ids),
+                            isDone: "true"
+                        }
+                    })
+                } else {
+                    result = await myajaxpost({
+                        url: 'http://127.0.0.1:5000/updateTodos',
+                        data: {
+                            ids: JSON.stringify(ids),
+                            isDone: "false"
+                        }
+                    })
+                }
+                /*
+                 *注意路由参数，路由配错了报错404
+                 *
+                 *
+                 */
+
+                footredan(result)
+            }
+            //渲染单个复选框,没必要改变数据库数据
+            const liinput = document.querySelectorAll('.todo-main li label input')
+            liinput.forEach((item) => {
+                if (item.checked) {
+                    coun++
+                }
+            })
+            if (coun === liinput.length) {
+                todo_footerinput.checked = "true"
+            } else {
+                //这里赋值必须是布尔值，如果是字符串会被转化成布尔值（非空即真），因此不能把checked隐藏
+                todo_footerinput.checked = ''
+            }
+
+        }
+        //every点击删除
+        async function deletcall(e) {
+            // console.log(e.target.id);
+            let result = await myajaxpost({
+                    url: "http://127.0.0.1:5000/deletTodo",
+                    data: {
+                        ids: JSON.stringify(e.target.id)
+                    }
+                })
+                //404报错有可能是路由路径写错
+            this.parentNode.remove()
+            headerrenda(result)
+            footredan(result)
+        }
+        //点击全选删除
+        function clearall(e) {
+            let inputs = document.querySelectorAll('.todo-main>li>label>input')
+            inputs.forEach(async(item) => {
+                    if (item.checked) {
+                        let result = await myajaxpost({
+                            url: 'http://127.0.0.1:5000/deletTodo',
+                            data: {
+                                ids: JSON.stringify(item.id)
+                            }
+                        })
+                        headerrenda(result)
+                        footredan(result)
+                    }
+                })
+                //因为foreach回调函数是异步函即使在点击事件函数声明变量，在foreach回调函数中修改也拿不到修改后的值
+                //因此必须把渲染的回调函数放在其中
+        }
+        //点击复全选选框全选
+        todo_footerinput.onclick = function(e) {
+            let todo_main = document.querySelectorAll('.todo-main li label input')
+            todo_main.forEach(async(item) => {
+                let result
+                let ids
+                if (e.target.checked) {
+                    ids = item.id
+                        //数据库方法要求添加数据格式字符串
+                    ids = [ids]
+                    result = await myajaxpost({
+                        url: 'http://127.0.0.1:5000/updateTodos',
+                        data: {
+                            isDone: 'true',
+                            ids: JSON.stringify(ids)
+                        }
+                    })
+                } else {
+                    ids = item.id
+                    ids = [ids]
+                    result = await myajaxpost({
+                        url: 'http://127.0.0.1:5000/updateTodos',
+                        data: {
+                            isDone: 'false',
+                            ids: JSON.stringify(ids)
+                        }
+                    })
+                }
+                //这里还是要渲染
+                headerrenda(result)
+            })
+
+        }
+    </script>
+</body>
+
+</html>
